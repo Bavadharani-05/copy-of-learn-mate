@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { LucideIcon } from './components/LucideIcon';
 import LandingPage from './components/LandingPage';
 import CharacterSetup from './components/CharacterSetup';
@@ -120,10 +120,10 @@ export function App() {
         speechUtteranceRef.current = utterance;
         setIsReadingAloud(true);
         window.speechSynthesis.speak(utterance);
-        triggerToast("🔊 Playing voice synthesis...");
+        triggerToast("ðŸ”Š Playing voice synthesis...");
       }
     } else {
-      triggerToast("❌ Text-to-Speech not supported on this browser.");
+      triggerToast("âŒ Text-to-Speech not supported on this browser.");
     }
   };
 
@@ -268,7 +268,7 @@ export function App() {
                   <div className="text-sm font-semibold text-slate-200 truncate">{user.name}</div>
                   <div className="text-xs text-brand-400 font-medium truncate flex items-center gap-1">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    {user.learningLevel} • {user.ageGroup}
+                    {user.learningLevel} â€¢ {user.ageGroup}
                   </div>
                 </div>
               </div>
@@ -289,7 +289,7 @@ export function App() {
                   if (activeConcept) {
                     setView("answer");
                   } else {
-                    triggerToast("💡 Ask a question first to view explanations!");
+                    triggerToast("ðŸ’¡ Ask a question first to view explanations!");
                     setView("dashboard");
                   }
                 }}
@@ -336,7 +336,7 @@ export function App() {
               <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-800">
                 <div className="text-xs text-slate-400 font-medium">Daily Streak</div>
                 <div className="text-xl font-bold font-display text-orange-400 mt-1 flex items-center justify-center gap-1.5">
-                  <span>🔥</span> {stats.streakDays} Days
+                  <span>ðŸ”¥</span> {stats.streakDays} Days
                 </div>
               </div>
             </div>
@@ -370,7 +370,7 @@ export function App() {
                 <button
                   onClick={() => {
                     setView("landing");
-                    triggerToast("👋 Logged out of profile.");
+                    triggerToast("ðŸ‘‹ Logged out of profile.");
                   }}
                   className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white transition-all text-xs font-medium"
                 >
@@ -458,6 +458,8 @@ export function App() {
               <ProfilePage
                 user={user}
                 setUser={setUser}
+                learnerProfile={learnerProfile}
+                setLearnerProfile={setLearnerProfile}
                 setView={setView}
                 triggerToast={triggerToast}
               />
@@ -470,3 +472,4 @@ export function App() {
 }
 
 export default App;
+

@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { LucideIcon } from './LucideIcon';
+import { transformResponse, responseFormats } from '../services/api';
+import { ResponseRenderer } from './responses/ResponseRenderer';
+import { parseTransformerResponse } from '../utils/jsonParser';
 
 export function AnswerDisplayPage({
   activeConcept,
@@ -15,6 +18,11 @@ export function AnswerDisplayPage({
   triggerToast
 }) {
   const [showExplainMenu, setShowExplainMenu] = useState(false);
+  const [selectedFormat, setSelectedFormat] = useState(null);
+  const [transformedData, setTransformedData] = useState(null);
+  const [isTransforming, setIsTransforming] = useState(false);
+  const [transformError, setTransformError] = useState("");
+  const [transformationCache, setTransformationCache] = useState({});
 
   // Get active text based on settings
   const ageGroupKey = learnerProfile?.ageGroup?.toLowerCase()?.includes("child") ? "child" :
@@ -27,28 +35,109 @@ export function AnswerDisplayPage({
   const analogyContent = activeConcept?.analogy || {};
   const analogyText = analogyContent[ageGroupKey] || Object.values(analogyContent)[0] || "";
 
+  // Reset cache if active concept or explanation changes
+  useEffect(() => {
+    setTransformationCache({});
+    setSelectedFormat(null);
+    setTransformedData(null);
+    setTransformError("");
+  }, [activeConcept?.title, explanationText]);
+
+  const handleFormatSelect = async (formatKey) => {
+    // 1. Guard against double-clicks while transforming
+    if (isTransforming) {
+      console.log("⚠️ [Transformer Guard] Request ignored: already transforming.");
+      return;
+    }
+
+    // 2. If already viewing this format with data, no-op
+    if (selectedFormat === formatKey && transformedData) {
+      return;
+    }
+
+    setSelectedFormat(formatKey);
+    setTransformError("");
+
+    // 3. Instant Cache Hit Check
+    if (transformationCache[formatKey]) {
+      console.log("⚡ [Cache HIT] Instant recall for format:", formatKey);
+      setTransformedData(transformationCache[formatKey]);
+      setIsTransforming(false);
+      return;
+    }
+
+    // 4. Cache Miss -> Make API Request
+    setIsTransforming(true);
+    setTransformedData(null);
+
+    try {
+      const learnerProfileText = `
+Age Group: ${learnerProfile?.ageGroup || user?.ageGroup || "College Student"}
+Learning Style Preference: ${learnerProfile?.learningPreference || user?.learningLevel || "Intermediate"}
+Visual Theme Color: ${learnerProfile?.color || user?.color || "Blue"}
+Preferred Study Place: ${learnerProfile?.environment || "Library"}
+Study Activity: ${learnerProfile?.activity || "Reading"}
+Character Traits: ${(learnerProfile?.traits || []).join(", ")}
+`;
+
+      const response = await transformResponse(
+        explanationText,
+        formatKey,
+        learnerProfileText
+      );
+
+      const parsed = parseTransformerResponse(response, formatKey);
+      console.log("Parsed structured data:", parsed);
+
+      if (!parsed) {
+        throw new Error("Unable to structure response data from transformer model.");
+      }
+
+      setTransformedData(parsed);
+      // Save to cache for instant future retrieval
+      setTransformationCache((prev) => ({
+        ...prev,
+        [formatKey]: parsed
+      }));
+    } catch (err) {
+      console.error("Failed to transform response:", err);
+      setTransformError(`Unable to transform. ${err.message || err}`);
+    } finally {
+      setIsTransforming(false);
+    }
+  };
+
+  const formatsList = [
+    { key: "simple", label: "Simple Explanation", icon: "book-open", emoji: "📖" },
+    { key: "steps", label: "Step-by-Step", icon: "list", emoji: "🪜" },
+    { key: "flashcards", label: "Flashcards", icon: "layers", emoji: "🃏" },
+    { key: "quiz", label: "Quiz", icon: "help-circle", emoji: "🎯" },
+    { key: "example", label: "Real-World Example", icon: "globe", emoji: "🌍" },
+    { key: "challenge", label: "Mini Challenge", icon: "gamepad-2", emoji: "🎮" },
+    { key: "story", label: "Story", icon: "book", emoji: "📚" },
+    { key: "keypoints", label: "Key Points", icon: "check-circle", emoji: "💡" }
+  ];
+
   const handleExplainDifferently = (styleName, ageGroup = null) => {
     setShowExplainMenu(false);
 
-    // Update preferences dynamically
     setUser(prev => ({
       ...prev,
       preferredStyles: [styleName, ...prev.preferredStyles.filter(s => s !== styleName)],
       ...(ageGroup && { ageGroup: ageGroup })
     }));
 
-    // Trigger toast and run pipeline animation again
     triggerToast(`✨ Recalibrating explanation for "${styleName}"...`);
     triggerPipelineSearch(activeConcept.title);
   };
 
   const explainMenuOptions = [
-    { name: "🧑 Like I'm a Child", style: "Simple Explanation", age: "Child" },
+    { name: "👶 Like I'm a Child", style: "Simple Explanation", age: "Child" },
     { name: "📖 Using a Story", style: "Story-based", age: null },
     { name: "💻 With a Coding Example", style: "Examples", age: null },
     { name: "📊 Using a Diagram", style: "Visual / Diagram", age: null },
-    { name: "🔢 Step-by-Step Explanation", style: "Step-by-Step", age: null },
-    { name: "🎯 With a Real-world Example", style: "Examples", age: "Adult" }
+    { name: "🪜 Step-by-Step Explanation", style: "Step-by-Step", age: null },
+    { name: "🌍 With a Real-world Example", style: "Examples", age: "Adult" }
   ];
 
   return (
@@ -63,7 +152,7 @@ export function AnswerDisplayPage({
             <span className="bg-brand-500/10 px-2 py-0.5 rounded border border-brand-500/10">Personalized</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white font-display flex items-center gap-2.5">
-            <span>🔄</span>
+            <span>📖</span>
             <span>{activeConcept.title}</span>
           </h1>
         </div>
@@ -122,7 +211,7 @@ export function AnswerDisplayPage({
       {/* Answer View Tabs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        {/* Left Column: Personalized Text */}
+        {/* Left Column: Personalized Text & Interactive Transformations */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Main customized explanation box */}
@@ -147,6 +236,94 @@ export function AnswerDisplayPage({
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Response Transformation Section */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-bold text-brand-400 uppercase tracking-wider">
+                  How would you like to learn this? ✨
+                </h3>
+                {Object.keys(transformationCache).length > 0 && (
+                  <span className="text-[10px] text-emerald-400 font-semibold px-2 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-500/20">
+                    ⚡ {Object.keys(transformationCache).length} cached
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                Choose an interactive format to transform the explanation above into custom learning experiences.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {formatsList.map((format) => {
+                  const isCached = !!transformationCache[format.key];
+                  const isSelected = selectedFormat === format.key;
+
+                  return (
+                    <button
+                      key={format.key}
+                      disabled={isTransforming}
+                      onClick={() => handleFormatSelect(format.key)}
+                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-3 transition-all duration-200 relative ${
+                        isSelected
+                          ? "bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-600/20 scale-[1.02]"
+                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:bg-slate-850/50 hover:text-slate-200 hover:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-xl">{format.emoji}</span>
+                        <div className="flex items-center gap-1.5">
+                          {isCached && !isSelected && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Cached for instant view" />
+                          )}
+                          <LucideIcon name={format.icon} className={`w-4 h-4 ${isSelected ? "text-white" : "text-slate-600"}`} />
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold leading-tight">{format.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Transform Loading State */}
+            {isTransforming && (
+              <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[160px] text-center space-y-4 animate-pulse">
+                <div className="relative">
+                  <div className="w-10 h-10 rounded-full border-4 border-brand-500/20 border-t-brand-500 animate-spin" />
+                  <span className="absolute inset-0 flex items-center justify-center text-xs">🧠</span>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">
+                    Creating your personalized {responseFormats[selectedFormat]} experience...
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Generating interactive structured learning cards with Qwen 2.5
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Transform Error State */}
+            {transformError && (
+              <div className="bg-rose-950/15 border border-rose-500/20 rounded-2xl p-5 text-center space-y-2">
+                <div className="text-rose-400 font-bold text-xs flex items-center justify-center gap-2">
+                  <LucideIcon name="alert-triangle" className="w-4 h-4" />
+                  <span>Transformation Failed</span>
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  {transformError}
+                </p>
+              </div>
+            )}
+
+            {/* Transformed Interactive Component Display */}
+            {!isTransforming && !transformError && transformedData && (
+              <div className="bg-slate-950/60 border border-brand-500/25 rounded-2xl p-6 space-y-4 animate-fade-in shadow-lg shadow-brand-500/5">
+                <ResponseRenderer data={transformedData} onReadAloud={handleReadAloud} />
+              </div>
+            )}
           </div>
 
           {/* Action Footer Button Links */}
@@ -206,7 +383,7 @@ export function AnswerDisplayPage({
               <span className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-400">
                 <LucideIcon name="code" className="w-4 h-4" />
               </span>
-              <h4 className="font-display font-bold text-sm text-slate-200">💡 Example Reference</h4>
+              <h4 className="font-display font-bold text-sm text-slate-200">💻 Example Reference</h4>
             </div>
             <pre className="code-block-pre text-xs text-brand-300 p-4 rounded-xl overflow-x-auto leading-relaxed">
               <code>{activeConcept.code}</code>

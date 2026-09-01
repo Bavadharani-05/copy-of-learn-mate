@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { LucideIcon } from './LucideIcon';
+import { generateLearnerProfile } from '../services/profile';
 
 export function LandingPage({ setView, user, setUser, setLearnerProfile }) {
   const [mockName, setMockName] = useState(user.name || "Alex");
@@ -28,61 +29,52 @@ export function LandingPage({ setView, user, setUser, setLearnerProfile }) {
           "Learning that adapts to you."
         </p>
         <p className="text-lg text-slate-400 leading-relaxed max-w-2xl mx-auto">
-          An AI-powered personalized learning platform that explains concepts in a way that works best for you.
-          No static answers—only dynamically generated tutoring mapped to your age, learning style, and level.
+          An intelligent educational platform that tailors visual themes, explanations, and interactive practice around your unique learner profile.
         </p>
       </div>
 
-      {/* Action Form Card */}
-      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden glow-indigo">
-        <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl"></div>
-
-        <form onSubmit={handleStart} className="space-y-6 relative z-10">
+      {/* Action Card / Form */}
+      <div className="w-full max-w-md bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur-xl">
+        <form onSubmit={handleStart} className="space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-2">
-              What is your name?
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+              What should we call you?
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <LucideIcon name="user" className="w-4 h-4 text-slate-500" />
-              </div>
               <input
                 type="text"
-                required
                 value={mockName}
                 onChange={(e) => setMockName(e.target.value)}
-                placeholder="Enter your name... e.g. Alex"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-colors"
+                placeholder="Enter your name..."
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3.5 text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-colors text-sm font-medium"
+                required
               />
+              <div className="absolute right-3.5 top-3.5 text-slate-500">
+                <LucideIcon name="user" className="w-4 h-4" />
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="space-y-3 pt-2">
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-brand-600 to-indigo-500 hover:from-brand-500 hover:to-indigo-400 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg hover:shadow-brand-500/25 flex items-center justify-center gap-2 group text-base"
+              className="w-full bg-brand-600 hover:bg-brand-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg hover:shadow-brand-500/25 flex items-center justify-center gap-2 group"
             >
-              <span>Get Started</span>
-              <LucideIcon name="arrow-right" className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <span>Personalize My Experience</span>
+              <LucideIcon name="sparkles" className="w-4 h-4 group-hover:rotate-12 transition-transform" />
             </button>
 
             <button
               type="button"
               onClick={() => {
                 setUser(prev => ({ ...prev, name: mockName || "Alex" }));
-                const defaultProfile = {
+                const defaultProfile = generateLearnerProfile({
                   color: "purple",
-                  environment: "library",
+                  place: "library",
                   activity: "reading",
                   ageGroup: "Teen",
-                  learningPreference: "step-by-step",
-                  characterTitle: "The Focused Scholar 📚",
-                  traits: ["creative", "focused", "thoughtful", "structured"],
-                  responseStyle: "creative and structured",
-                  uiTheme: "purple-library",
-                  description: "You thrive on creative, imaginative inputs. Mapped to the library and reading, your LearnMate experience will balance focus with expression."
-                };
+                  learningPreference: "step-by-step"
+                });
                 setLearnerProfile(defaultProfile);
                 localStorage.setItem("learnmateProfile", JSON.stringify(defaultProfile));
                 setView("dashboard");
@@ -98,25 +90,32 @@ export function LandingPage({ setView, user, setUser, setLearnerProfile }) {
       {/* Visual Pipeline Flow Chart for Landing Page */}
       <div className="mt-16 w-full max-w-4xl bg-slate-900/40 border border-slate-900 rounded-3xl p-6 glass-panel-light text-center">
         <h4 className="text-sm font-semibold tracking-wider text-slate-500 uppercase mb-6">
-          The Personalized Learning Pipeline
+          End-to-End Multimodal Adaptation Pipeline
         </h4>
-        <div className="grid grid-cols-1 sm:grid-cols-5 items-center gap-4 text-xs font-semibold text-slate-400">
-          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-900 flex flex-col items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-brand-400 font-bold border border-slate-800">1</div>
-            <span>User Question</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
+          <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850">
+            <div className="text-brand-400 font-bold text-xs uppercase mb-1">01. Profile Setup</div>
+            <div className="text-sm font-semibold text-slate-200">Color, Place & Style</div>
+            <div className="text-xs text-slate-500 mt-1">Multi-trait deterministic persona calculation</div>
           </div>
-          <div className="hidden sm:block text-slate-700"><LucideIcon name="arrow-right" className="mx-auto w-5 h-5" /></div>
-          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-900 flex flex-col items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-brand-400 font-bold border border-slate-800">2</div>
-            <span>AI Response Pool</span>
+          <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850">
+            <div className="text-indigo-400 font-bold text-xs uppercase mb-1">02. Theme Engine</div>
+            <div className="text-sm font-semibold text-slate-200">Dynamic Atmosphere</div>
+            <div className="text-xs text-slate-500 mt-1">Live backgrounds, mesh gradients & CSS variables</div>
           </div>
-          <div className="hidden sm:block text-slate-700"><LucideIcon name="arrow-right" className="mx-auto w-5 h-5" /></div>
-          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-900 flex flex-col items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-brand-400 font-bold border border-slate-800">3</div>
-            <span>Evaluation & Optimization</span>
+          <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850">
+            <div className="text-emerald-400 font-bold text-xs uppercase mb-1">03. AI Explanations</div>
+            <div className="text-sm font-semibold text-slate-200">Dual Model Pipeline</div>
+            <div className="text-xs text-slate-500 mt-1">SmolLM2 content + Qwen 2.5 response transformer</div>
+          </div>
+          <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-850">
+            <div className="text-amber-400 font-bold text-xs uppercase mb-1">04. Interactive Modes</div>
+            <div className="text-sm font-semibold text-slate-200">8 Learning Formats</div>
+            <div className="text-xs text-slate-500 mt-1">3D Flashcards, live Quiz, timeline Steps, and Challenges</div>
           </div>
         </div>
       </div>
+
     </div>
   );
 }

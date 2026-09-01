@@ -1,60 +1,17 @@
-export function generateLearnerProfile(selections) {
-  const { color, place, activity, ageGroup, learningPreference } = selections;
+﻿import { generateLearnerCharacter } from './characterEngine.js';
 
-  // Trait mappings
-  const colorTraits = {
-    blue: ["calm", "focused"],
-    green: ["natural", "balanced"],
-    purple: ["creative", "imaginative"],
-    orange: ["energetic", "bold"]
-  };
+export function generateLearnerProfile(selections = {}) {
+  const {
+    color = "purple",
+    place = "library",
+    activity = "reading",
+    ageGroup = "Teen",
+    learningPreference = "step-by-step"
+  } = selections;
 
-  const placeTraits = {
-    garden: ["relaxed", "curious"],
-    library: ["focused", "knowledge-oriented"],
-    home: ["comfortable", "reflective"],
-    restaurant: ["social", "energetic"]
-  };
+  // Use the deterministic character engine
+  const charResult = generateLearnerCharacter(selections);
 
-  const activityTraits = {
-    playing: ["interactive", "playful"],
-    reading: ["analytical", "thoughtful"],
-    dancing: ["expressive", "energetic"],
-    music: ["creative", "emotional"]
-  };
-
-  const learningTraits = {
-    "quick-simple": ["efficient"],
-    "step-by-step": ["structured"],
-    "practice-first": ["applied"],
-    "detailed-explanation": ["in-depth"]
-  };
-
-  const traitsSet = new Set([
-    ...(colorTraits[color.toLowerCase()] || []),
-    ...(placeTraits[place.toLowerCase()] || []),
-    ...(activityTraits[activity.toLowerCase()] || []),
-    ...(learningTraits[learningPreference] || [])
-  ]);
-  const traits = Array.from(traitsSet);
-
-  // Generate a Character Title
-  let characterTitle = "The Mindful Learner 🎯";
-  if (activity === "reading" && place === "library") {
-    characterTitle = "The Focused Scholar 📚";
-  } else if (activity === "playing" && place === "garden") {
-    characterTitle = "The Curious Explorer 🌳";
-  } else if (activity === "dancing" && place === "restaurant") {
-    characterTitle = "The Energetic Pioneer ⚡";
-  } else if (activity === "music" && place === "home") {
-    characterTitle = "The Reflective Harmonizer 🎵";
-  } else {
-    const adj = color === "purple" ? "Creative" : color === "blue" ? "Calm" : color === "green" ? "Balanced" : "Bold";
-    const noun = activity === "playing" ? "Player" : activity === "reading" ? "Reader" : activity === "dancing" ? "Creator" : "Listener";
-    characterTitle = `The ${adj} ${noun} ✨`;
-  }
-
-  // Response Style Summary
   let styleSummary = "adaptive";
   if (learningPreference === "quick-simple") {
     styleSummary = "concise and direct";
@@ -66,19 +23,7 @@ export function generateLearnerProfile(selections) {
     styleSummary = "in-depth and comprehensive";
   }
 
-  const responseStyle = `${traits[0] || "custom"} and ${styleSummary}`;
-
-  // Personalized Description
-  let description = "";
-  if (color === "purple") {
-    description = `You thrive on creative, imaginative inputs. With a preference for the ${place} and ${activity}, your learning journey is personalized to balance expression with your ${learningPreference} style.`;
-  } else if (color === "blue") {
-    description = `You appreciate focused, calm environments. Mapped to the ${place} and ${activity}, your learning is structured to optimize deep focus and clarity using your preferred ${learningPreference} approach.`;
-  } else if (color === "green") {
-    description = `You value balance and natural flow. Combined with the ${place} and ${activity}, your learning material is curated to feel organic and aligned with your ${learningPreference} preference.`;
-  } else {
-    description = `You are motivated by bold, energetic themes. Styled around the ${place} and ${activity}, your LearnMate experience will be highly engaging and dynamic, paced for your ${learningPreference} preference.`;
-  }
+  const responseStyle = `${charResult.traits[0] || "Adaptive"} and ${styleSummary}`;
 
   return {
     color: color.toLowerCase(),
@@ -86,11 +31,16 @@ export function generateLearnerProfile(selections) {
     activity: activity.toLowerCase(),
     ageGroup,
     learningPreference,
-    characterTitle,
-    traits,
+    characterTitle: charResult.characterTitle,
+    shortTitle: charResult.shortTitle,
+    archetype: charResult.archetype,
+    traits: charResult.traits,
+    rawTraits: charResult.rawTraits,
+    topTraits: charResult.topTraits,
+    recommendedFormats: charResult.recommendedFormats,
     responseStyle,
     uiTheme: `${color.toLowerCase()}-${place.toLowerCase()}`,
-    description
+    description: charResult.description
   };
 }
 
@@ -174,28 +124,28 @@ export function applyLearnerTheme(profile) {
   const activity = profile.activity || "reading";
 
   // Card rounded corners
-  let roundedClass = '1.5rem'; // Default 3xl
+  let roundedClass = '1.5rem';
   if (environment === 'home') {
-    roundedClass = '2rem'; // Extra rounded comfortable
+    roundedClass = '2rem';
   } else if (environment === 'library') {
-    roundedClass = '1rem'; // Structured/focused
+    roundedClass = '1rem';
   } else if (environment === 'garden') {
-    roundedClass = '1.75rem'; // Organic rounded
+    roundedClass = '1.75rem';
   } else if (environment === 'restaurant') {
-    roundedClass = '1.25rem'; // Standard rounded
+    roundedClass = '1.25rem';
   }
   document.documentElement.style.setProperty('--theme-card-rounded', roundedClass);
 
   // Micro animation speed
   let animationDuration = '0.5s';
-  if (activity === 'dancing' || environment === 'restaurant') {
-    animationDuration = '0.3s'; // Energetic/fast
+  if (activity === 'dancing' || activity === 'dance' || environment === 'restaurant') {
+    animationDuration = '0.3s';
   } else if (activity === 'music') {
-    animationDuration = '0.7s'; // Slow and emotional/relaxed
+    animationDuration = '0.7s';
   } else if (activity === 'playing') {
-    animationDuration = '0.4s'; // Snappy/playful
+    animationDuration = '0.4s';
   } else if (activity === 'reading' || environment === 'library') {
-    animationDuration = '0.6s'; // Calm & steady
+    animationDuration = '0.6s';
   }
   document.documentElement.style.setProperty('--theme-anim-duration', animationDuration);
 
@@ -244,15 +194,16 @@ export function applyLearnerTheme(profile) {
 export function buildPersonalizedPrompt(question, profile) {
   if (!profile) return question;
 
-  const traits = profile.traits ? profile.traits.join(", ") : "";
+  const traits = Array.isArray(profile.traits) ? profile.traits.join(", ") : "";
 
   return `Learner Profile:
 Age group: ${profile.ageGroup || "Adult"}
+Learning character: ${profile.characterTitle || "Adaptive Learner"}
 Learning preference: ${profile.learningPreference || "Step-by-Step"}
 Environment preference: ${profile.environment || "Library"}
 Activity preference: ${profile.activity || "Reading"}
 Color preference: ${profile.color || "Blue"}
-Characteristics: ${traits}
+Learning traits: ${traits}
 
 User Question:
 ${question}
@@ -265,3 +216,4 @@ Use simple examples where useful.
 Do not mention the learner profile in the answer.
 Do not claim that the profile scientifically determines the user's personality.`;
 }
+
