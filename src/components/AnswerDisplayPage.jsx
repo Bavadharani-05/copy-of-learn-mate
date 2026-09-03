@@ -26,8 +26,8 @@ export function AnswerDisplayPage({
 
   // Get active text based on settings
   const ageGroupKey = learnerProfile?.ageGroup?.toLowerCase()?.includes("child") ? "child" :
-                      learnerProfile?.ageGroup?.toLowerCase()?.includes("teen") ? "teen" :
-                      learnerProfile?.ageGroup?.toLowerCase()?.includes("college") ? "college" : "adult";
+    learnerProfile?.ageGroup?.toLowerCase()?.includes("teen") ? "teen" :
+      learnerProfile?.ageGroup?.toLowerCase()?.includes("college") ? "college" : "adult";
 
   const ageContent = activeConcept?.ageContent || {};
   const explanationText = ageContent[ageGroupKey] || Object.values(ageContent)[0] || "";
@@ -265,11 +265,10 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
                       key={format.key}
                       disabled={isTransforming}
                       onClick={() => handleFormatSelect(format.key)}
-                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-3 transition-all duration-200 relative ${
-                        isSelected
-                          ? "bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-600/20 scale-[1.02]"
-                          : "bg-slate-950/60 border-slate-850 text-slate-400 hover:bg-slate-850/50 hover:text-slate-200 hover:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      }`}
+                      className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between gap-3 transition-all duration-200 relative ${isSelected
+                        ? "bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-600/20 scale-[1.02]"
+                        : "bg-slate-950/60 border-slate-850 text-slate-400 hover:bg-slate-850/50 hover:text-slate-200 hover:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        }`}
                     >
                       <div className="flex items-center justify-between w-full">
                         <span className="text-xl">{format.emoji}</span>
@@ -297,9 +296,6 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
                 <div>
                   <p className="text-sm font-bold text-white">
                     Creating your personalized {responseFormats[selectedFormat]} experience...
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Generating interactive structured learning cards with Qwen 2.5
                   </p>
                 </div>
               </div>
@@ -377,31 +373,20 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
             </div>
           )}
 
-          {/* Example / Code Box */}
+          Example / Code Box
           <div className="bg-slate-900 border border-slate-850 rounded-3xl p-6 space-y-4">
-            <div className="flex items-center gap-2">
+            {/* <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-400">
                 <LucideIcon name="code" className="w-4 h-4" />
               </span>
               <h4 className="font-display font-bold text-sm text-slate-200">💻 Example Reference</h4>
-            </div>
+            </div> */}
             <pre className="code-block-pre text-xs text-brand-300 p-4 rounded-xl overflow-x-auto leading-relaxed">
               <code>{activeConcept.code}</code>
             </pre>
           </div>
 
-          {/* Key Remember box */}
-          <div className="bg-emerald-950/10 border border-emerald-500/10 rounded-3xl p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-400">
-                <LucideIcon name="bookmark" className="w-4 h-4" />
-              </span>
-              <h4 className="font-display font-bold text-sm text-emerald-300">📌 Remember</h4>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              {activeConcept.remember}
-            </p>
-          </div>
+
 
         </div>
 

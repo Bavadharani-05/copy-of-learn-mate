@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LucideIcon } from './LucideIcon';
 
-export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, userSearchHistory, setView, setActiveConcept }) {
+export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, userSearchHistory, setView, setActiveConcept, stats }) {
   const [typedInput, setTypedInput] = useState("");
   const [showMicAlert, setShowMicAlert] = useState(false);
   const [showClipAlert, setShowClipAlert] = useState(false);
@@ -39,6 +39,14 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
           <p className="text-slate-400 text-sm md:text-base mt-1">What would you like to learn today? Your AI tutor is loaded and ready.</p>
         </div>
         <div className="flex items-center gap-2.5">
+          {stats && (
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-400">Daily Streak:</span>
+              <span className="text-xs bg-orange-500/20 text-orange-300 font-bold px-2 py-0.5 rounded-full border border-orange-500/20 flex items-center gap-1">
+                <span>🔥</span> {stats.streakDays} {stats.streakDays === 1 ? 'Day' : 'Days'}
+              </span>
+            </div>
+          )}
           <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-400">Settings Status:</span>
             <span className="text-xs bg-brand-500/20 text-brand-300 font-bold px-2 py-0.5 rounded-full border border-brand-500/20">Active</span>

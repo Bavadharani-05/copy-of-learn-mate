@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { LucideIcon } from './components/LucideIcon';
 import LandingPage from './components/LandingPage';
 import CharacterSetup from './components/CharacterSetup';
@@ -12,6 +12,7 @@ import ProgressPage from './components/ProgressPage';
 import ProfilePage from './components/ProfilePage';
 
 import { MOCK_TOPICS, generateDynamicExplanation } from './constants/mockData';
+import { getStreakData, recordDailyActivity } from './services/streakService';
 
 export function App() {
   // On mount, check if there is a saved learner profile
@@ -85,17 +86,42 @@ export function App() {
   ]);
 
   // Statistics
-  const [stats, setStats] = useState({
-    conceptsLearned: 3,
-    questionsAsked: 12,
-    practiceAccuracy: 85,
-    streakDays: 7
+  const [stats, setStats] = useState(() => {
+    const streakInfo = getStreakData();
+    return {
+      conceptsLearned: 3,
+      questionsAsked: 12,
+      practiceAccuracy: 85,
+      streakDays: streakInfo.streakDays
+    };
   });
 
   // Sound and notifications states
   const [showToast, setShowToast] = useState(null);
   const [isReadingAloud, setIsReadingAloud] = useState(false);
   const speechUtteranceRef = useRef(null);
+
+  // Sync streak on mount (checks if streak was broken due to inactivity)
+  useEffect(() => {
+    const streakInfo = getStreakData();
+    setStats(prev => ({
+      ...prev,
+      streakDays: streakInfo.streakDays
+    }));
+  }, []);
+
+  // Record daily activity helper
+  const handleRecordDailyActivity = () => {
+    const res = recordDailyActivity();
+    setStats(prev => ({
+      ...prev,
+      streakDays: res.streakDays
+    }));
+    if (res.isNewIncrement) {
+      triggerToast(res.message);
+    }
+    return res;
+  };
 
   // Show customized feedback toast
   const triggerToast = (message) => {
@@ -120,10 +146,10 @@ export function App() {
         speechUtteranceRef.current = utterance;
         setIsReadingAloud(true);
         window.speechSynthesis.speak(utterance);
-        triggerToast("ðŸ”Š Playing voice synthesis...");
+        triggerToast("🔊 Playing voice synthesis...");
       }
     } else {
-      triggerToast("âŒ Text-to-Speech not supported on this browser.");
+      triggerToast("❌ Text-to-Speech not supported on this browser.");
     }
   };
 
@@ -214,6 +240,9 @@ export function App() {
       }));
     }
 
+    // Record daily activity for streak
+    handleRecordDailyActivity();
+
     setView("answer");
   };
 
@@ -268,7 +297,7 @@ export function App() {
                   <div className="text-sm font-semibold text-slate-200 truncate">{user.name}</div>
                   <div className="text-xs text-brand-400 font-medium truncate flex items-center gap-1">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    {user.learningLevel} â€¢ {user.ageGroup}
+                    {user.learningLevel} • {user.ageGroup}
                   </div>
                 </div>
               </div>
@@ -289,7 +318,7 @@ export function App() {
                   if (activeConcept) {
                     setView("answer");
                   } else {
-                    triggerToast("ðŸ’¡ Ask a question first to view explanations!");
+                    triggerToast("💡 Ask a question first to view explanations!");
                     setView("dashboard");
                   }
                 }}
@@ -336,7 +365,23 @@ export function App() {
               <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-800">
                 <div className="text-xs text-slate-400 font-medium">Daily Streak</div>
                 <div className="text-xl font-bold font-display text-orange-400 mt-1 flex items-center justify-center gap-1.5">
-                  <span>ðŸ”¥</span> {stats.streakDays} Days
+                  <span>🔥</span> {stats.streakDays} {stats.streakDays === 1 ? 'Day' : 'Days'}
+                </div>
+                <div className="mt-2 pt-2 border-t border-slate-800/60">
+                  {getStreakData().isActiveToday ? (
+                    <div className="text-[11px] text-emerald-400 font-medium flex items-center justify-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Active Today
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleRecordDailyActivity}
+                      className="text-[11px] text-brand-400 hover:text-brand-300 font-medium underline transition-colors cursor-pointer"
+                      title="Click to check in today"
+                    >
+                      Check in today 🔥
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -370,7 +415,7 @@ export function App() {
                 <button
                   onClick={() => {
                     setView("landing");
-                    triggerToast("ðŸ‘‹ Logged out of profile.");
+                    triggerToast("👋 Logged out of profile.");
                   }}
                   className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white transition-all text-xs font-medium"
                 >
@@ -402,6 +447,8 @@ export function App() {
                 userSearchHistory={userSearchHistory}
                 setView={setView}
                 setActiveConcept={setActiveConcept}
+                stats={stats}
+                onRecordDailyActivity={handleRecordDailyActivity}
               />
             )}
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { LucideIcon } from './LucideIcon';
+import { recordDailyActivity } from '../services/streakService';
 
 export function PracticePage({
   activeConcept,
@@ -36,6 +37,12 @@ export function PracticePage({
       isCorrect: isCorrect
     });
 
+    // Record daily activity for streak
+    const streakResult = recordDailyActivity();
+    if (streakResult.isNewIncrement) {
+      triggerToast(streakResult.message);
+    }
+
     // Update stats
     setStats(prev => {
       const newAsked = prev.questionsAsked + 1;
@@ -45,7 +52,8 @@ export function PracticePage({
       return {
         ...prev,
         questionsAsked: newAsked,
-        practiceAccuracy: newAccuracy
+        practiceAccuracy: newAccuracy,
+        streakDays: streakResult.streakDays
       };
     });
 

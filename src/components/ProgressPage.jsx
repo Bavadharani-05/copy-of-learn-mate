@@ -1,6 +1,7 @@
 import React from 'react';
 import { LucideIcon } from './LucideIcon';
 import { MOCK_TOPICS } from '../constants/mockData';
+import { getStreakData } from '../services/streakService';
 
 export function ProgressPage({ stats, userSearchHistory, setView, setActiveConcept, triggerPipelineSearch }) {
 
@@ -64,8 +65,12 @@ export function ProgressPage({ stats, userSearchHistory, setView, setActiveConce
             <LucideIcon name="zap" className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xl md:text-2xl font-bold font-display text-orange-400">{stats.streakDays} Days 🔥</div>
-            <div className="text-xs text-slate-500 font-semibold mt-0.5">Learning Streak</div>
+            <div className="text-xl md:text-2xl font-bold font-display text-orange-400">
+              {stats.streakDays} {stats.streakDays === 1 ? 'Day' : 'Days'} 🔥
+            </div>
+            <div className="text-xs text-slate-500 font-semibold mt-0.5">
+              {getStreakData().isActiveToday ? "Streak Active Today ✓" : "Learning Streak"}
+            </div>
           </div>
         </div>
 
