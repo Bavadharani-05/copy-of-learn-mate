@@ -168,61 +168,56 @@ export function App() {
   };
 
   // Complete processing simulation and fetch explanation
+  // Complete processing simulation and fetch explanation
   const finalizePipelineSearch = (query, apiResults = null) => {
-    let conceptData;
-    const lowerQuery = query.toLowerCase();
-
-    if (apiResults) {
-      conceptData = {
-        title: query,
-        category: "AI Model Response",
-        icon: "cpu",
-        color: "from-brand-600 to-indigo-500",
-        remember: "This explanation was generated live by your SmolLM2 model.",
-        code: apiResults.answer_a,
-        ageContent: {
-          child: apiResults.answer_a,
-          teen: apiResults.answer_a,
-          college: apiResults.answer_a,
-          adult: apiResults.answer_a
-        },
-        styleContent: {
-          "Simple Explanation": apiResults.answer_a,
-          "Examples": apiResults.answer_b,
-          "Step-by-Step": apiResults.answer_a,
-          "Visual / Diagram": apiResults.answer_b,
-          "Story-based": apiResults.answer_b,
-          "Interactive Practice": apiResults.answer_a
-        },
-        analogy: {
-          child: apiResults.answer_b,
-          teen: apiResults.answer_b,
-          college: apiResults.answer_b,
-          adult: apiResults.answer_b
-        },
-        practice: [
-          {
-            question: `Which generated answer approach did you find more helpful for "${query}"?`,
-            options: [
-              "Answer A (Direct / Direct tutor explanations)",
-              "Answer B (Creative / Analogy & story elements)",
-              "Both templates were helpful",
-              "Neither template was helpful"
-            ],
-            correct: 0,
-            explanation: "Answer A focuses on direct, simple syntax, whereas Answer B leverages creative examples and real-world analogies."
-          }
-        ]
-      };
-    } else if (lowerQuery.includes("recursion")) {
-      conceptData = MOCK_TOPICS.recursion;
-    } else if (lowerQuery.includes("photosynthesis") || lowerQuery.includes("photo")) {
-      conceptData = MOCK_TOPICS.photosynthesis;
-    } else if (lowerQuery.includes("binary") || lowerQuery.includes("base-2")) {
-      conceptData = MOCK_TOPICS.binary;
-    } else {
-      conceptData = generateDynamicExplanation(query, user);
+    if (!apiResults) {
+      setView("dashboard");
+      triggerToast("Search cancelled or unable to retrieve response.");
+      return;
     }
+
+    const conceptData = {
+      title: query,
+      category: "AI Model Response",
+      icon: "cpu",
+      color: "from-brand-600 to-indigo-500",
+      remember: "This explanation was generated live by your LearnMate model on Hugging Face.",
+      code: apiResults.answer_b || apiResults.answer_a,
+      ageContent: {
+        child: apiResults.answer_a,
+        teen: apiResults.answer_a,
+        college: apiResults.answer_a,
+        adult: apiResults.answer_a
+      },
+      styleContent: {
+        [user.preferredStyles[0] || "Simple Explanation"]: apiResults.answer_b,
+        "Simple Explanation": apiResults.answer_b,
+        "Examples": apiResults.answer_b,
+        "Step-by-Step": apiResults.answer_b,
+        "Visual / Diagram": apiResults.answer_b,
+        "Story-based": apiResults.answer_b,
+        "Interactive Practice": apiResults.answer_b
+      },
+      analogy: {
+        child: apiResults.answer_b,
+        teen: apiResults.answer_b,
+        college: apiResults.answer_b,
+        adult: apiResults.answer_b
+      },
+      practice: [
+        {
+          question: `Which generated answer approach did you find more helpful for "${query}"?`,
+          options: [
+            "Standard Explanation (Systematic & core principles)",
+            "Personalized Explanation (Adapted to your style & environment)",
+            "Both explanations were helpful",
+            "Neither explanation was helpful"
+          ],
+          correct: 0,
+          explanation: "The Standard explanation provides systematic factual principles, while the Personalized explanation adapts the concept to your learning preferences."
+        }
+      ]
+    };
 
     setActiveConcept(conceptData);
 
@@ -230,7 +225,7 @@ export function App() {
     const exists = userSearchHistory.some(h => h.query.toLowerCase() === query.toLowerCase());
     if (!exists) {
       setUserSearchHistory([
-        { query: query, date: "Just now", topicId: lowerQuery.includes("recursion") ? "recursion" : lowerQuery.includes("photo") ? "photosynthesis" : lowerQuery.includes("binary") ? "binary" : "custom" },
+        { query: query, date: "Just now", topicId: "custom" },
         ...userSearchHistory
       ]);
       setStats(prev => ({

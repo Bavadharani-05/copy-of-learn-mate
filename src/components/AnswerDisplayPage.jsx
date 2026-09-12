@@ -1,8 +1,9 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LucideIcon } from './LucideIcon';
 import { transformResponse, responseFormats } from '../services/api';
 import { ResponseRenderer } from './responses/ResponseRenderer';
 import { parseTransformerResponse } from '../utils/jsonParser';
+import { AnimatedExplanationPlayer } from './animated/AnimatedExplanationPlayer';
 
 export function AnswerDisplayPage({
   activeConcept,
@@ -23,6 +24,7 @@ export function AnswerDisplayPage({
   const [isTransforming, setIsTransforming] = useState(false);
   const [transformError, setTransformError] = useState("");
   const [transformationCache, setTransformationCache] = useState({});
+  const [showAnimatedExplanation, setShowAnimatedExplanation] = useState(false);
 
   // Get active text based on settings
   const ageGroupKey = learnerProfile?.ageGroup?.toLowerCase()?.includes("child") ? "child" :
@@ -41,6 +43,7 @@ export function AnswerDisplayPage({
     setSelectedFormat(null);
     setTransformedData(null);
     setTransformError("");
+    setShowAnimatedExplanation(false);
   }, [activeConcept?.title, explanationText]);
 
   const handleFormatSelect = async (formatKey) => {
@@ -215,12 +218,12 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Main customized explanation box */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
-            <div>
-              <h3 className="text-xs font-bold text-brand-400 uppercase tracking-wider mb-2">
-                Customized Explanation for {user.name} ({learnerProfile?.characterTitle || `${user.ageGroup} level`})
+          <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 backdrop-blur-md shadow-2xl">
+            <div className="bg-slate-950/80 border border-slate-800/80 p-5 md:p-6 rounded-2xl shadow-inner backdrop-blur-sm space-y-3">
+              <h3 className="text-xs font-bold text-brand-400 uppercase tracking-wider">
+                Customized Explanation for you!
               </h3>
-              <p className="text-slate-200 text-base md:text-lg leading-relaxed font-medium">
+              <p className="text-slate-100 text-base md:text-lg leading-relaxed font-medium">
                 {explanationText}
               </p>
             </div>
@@ -236,7 +239,52 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
                 </p>
               </div>
             </div>
+
+            {/* 🎬 Animated Explanation Launch Section */}
+            <div className="border-t border-slate-850 pt-6 flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <span>Prefer visual learning & audio?</span>
+                  <span className="text-[10px] bg-brand-500/20 text-brand-300 px-2 py-0.5 rounded-full font-medium">New</span>
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Break this answer into 3–5 animated scenes with voice narration and interactive diagrams.
+                </p>
+              </div>
+
+              <button
+                id="animated-explanation-btn"
+                onClick={() => {
+                  if (!showAnimatedExplanation && 'speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                  }
+                  setShowAnimatedExplanation((prev) => !prev);
+                }}
+                className={`px-5 py-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2.5 transition-all duration-300 shadow-xl ${showAnimatedExplanation
+                  ? "bg-slate-800 text-brand-300 border border-brand-500/40 hover:bg-slate-750"
+                  : "bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-[1.02] active:scale-95"
+                  }`}
+              >
+                <span className="text-base">🎬</span>
+                <span>{showAnimatedExplanation ? "Close Animated Explanation" : "🎬 Animated Explanation"}</span>
+                <LucideIcon name={showAnimatedExplanation ? "chevron-up" : "play"} className="w-4 h-4 ml-0.5" />
+              </button>
+            </div>
           </div>
+
+          {/* 🎬 Animated Explanation Player Stage */}
+          {showAnimatedExplanation && (
+            <AnimatedExplanationPlayer
+              title={activeConcept?.title || "Concept Explanation"}
+              explanationText={explanationText}
+              onClose={() => {
+                if ('speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+                }
+                setShowAnimatedExplanation(false);
+              }}
+            />
+          )}
 
           {/* Response Transformation Section */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
@@ -288,7 +336,7 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
 
             {/* Transform Loading State */}
             {isTransforming && (
-              <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[160px] text-center space-y-4 animate-pulse">
+              <div className="bg-slate-950/95 border border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center min-h-[160px] text-center space-y-4 animate-pulse shadow-2xl backdrop-blur-md">
                 <div className="relative">
                   <div className="w-10 h-10 rounded-full border-4 border-brand-500/20 border-t-brand-500 animate-spin" />
                   <span className="absolute inset-0 flex items-center justify-center text-xs">🧠</span>
