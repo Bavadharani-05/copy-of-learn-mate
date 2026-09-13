@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { LucideIcon } from '../LucideIcon';
 
 export function ExampleResponse({ data, onReadAloud }) {
@@ -8,10 +8,10 @@ export function ExampleResponse({ data, onReadAloud }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">
-            Real-World Application
+            Real-World Application (for example)
           </span>
           <h3 className="text-lg font-bold text-white font-display">
-            {data?.title || "Everyday Example"}
+            {data?.title ? `${data.title} (for example)` : "Everyday Example (for example)"}
           </h3>
         </div>
 
@@ -31,7 +31,7 @@ export function ExampleResponse({ data, onReadAloud }) {
         <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-4">
           <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wider">
             <span className="p-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20">🌍</span>
-            <span>The Real-World Scenario</span>
+            <span>The Real-World Scenario (for example)</span>
           </div>
           <p className="text-slate-200 text-base leading-relaxed font-medium">
             {data?.scenario}

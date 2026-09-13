@@ -1,9 +1,120 @@
 import React, { useState, useEffect } from 'react';
 import { LucideIcon } from './LucideIcon';
 import { transformResponse, responseFormats } from '../services/api';
+import { adaptExplanationForLearner, stripPersonaMetadata } from '../services/profile';
 import { ResponseRenderer } from './responses/ResponseRenderer';
 import { parseTransformerResponse } from '../utils/jsonParser';
 import { AnimatedExplanationPlayer } from './animated/AnimatedExplanationPlayer';
+import { DynamicAnimatedLearningVideo } from './animated/DynamicAnimatedLearningVideo';
+
+/**
+ * Renders topic explanations cleanly:
+ * - Strips literal ** from topics/subtopics so they appear like "Introduction:"
+ * - Formats points under subtopics as clean, styled bullet points
+ * - Cleans stray asterisks from paragraph text
+ */
+function FormattedExplanation({ text, isPersonalized = false }) {
+  if (!text || typeof text !== "string") return null;
+
+  const rawLines = text.split(/\r?\n/);
+  const elements = [];
+  let currentList = [];
+  let blockKey = 0;
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key={`list-${blockKey++}`} className="space-y-2 my-2.5 pl-1">
+          {currentList.map((item, idx) => (
+            <li key={idx} className="flex items-start gap-2.5 text-sm md:text-base leading-relaxed text-slate-200">
+              <span
+                className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${
+                  isPersonalized ? "bg-brand-400" : "bg-indigo-400"
+                }`}
+              />
+              <span className="flex-1">{item}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  for (let i = 0; i < rawLines.length; i++) {
+    let line = rawLines[i].trim();
+    if (!line) {
+      flushList();
+      continue;
+    }
+
+    // Check if line is a subtopic heading:
+    // e.g. "**Introduction:**", "**What is OS?**", "### Introduction", "1. **What is an OS?**", "Introduction:"
+    const isHeading = (
+      /^#+\s+/.test(line) ||
+      /^(?:\d+\.\s*)?\*\*[^*]+\*\*:?$/.test(line) ||
+      /^[A-Z][A-Za-z0-9\s/()—–-]{2,45}:\s*$/.test(line) ||
+      /^Step\s+\d+:/i.test(line) ||
+      line.startsWith("🪜") ||
+      line.startsWith("🎯") ||
+      line.startsWith("🌍") ||
+      line.startsWith("💡") ||
+      line.startsWith("⚡")
+    );
+
+    if (isHeading) {
+      flushList();
+
+      // Clean all asterisks and leading markdown hashes
+      let cleanHeading = line
+        .replace(/^#+\s*/, "")
+        .replace(/\*\*/g, "")
+        .trim();
+
+      // Format clean subtopic like "Introduction:"
+      if (!cleanHeading.endsWith(":") && !cleanHeading.endsWith("?") && !cleanHeading.endsWith("!")) {
+        cleanHeading = cleanHeading + ":";
+      }
+
+      elements.push(
+        <h4
+          key={`heading-${blockKey++}`}
+          className={`text-sm md:text-base font-bold tracking-wide mt-4 mb-2 flex items-center gap-2 ${
+            isPersonalized ? "text-brand-300" : "text-indigo-300"
+          }`}
+        >
+          {cleanHeading}
+        </h4>
+      );
+      continue;
+    }
+
+    // Check if line is a bullet item or subtopic point:
+    // e.g. "- item", "* item", "• item", "1. item", "2) item", "a. item"
+    const listMatch = line.match(/^(?:[-*•]|\d+[.)]|[a-zA-Z][.)]|🎈\s*\d+[.)])\s*(.*)$/);
+    if (listMatch) {
+      const cleanedItem = listMatch[1].replace(/\*\*/g, "").trim();
+      currentList.push(cleanedItem);
+      continue;
+    }
+
+    flushList();
+
+    // Normal paragraph text (remove any stray raw ** asterisks)
+    const cleanParagraph = line.replace(/\*\*/g, "").trim();
+    if (cleanParagraph) {
+      elements.push(
+        <p key={`p-${blockKey++}`} className="text-sm md:text-base leading-relaxed text-slate-200 my-2">
+          {cleanParagraph}
+        </p>
+      );
+    }
+  }
+
+  flushList();
+
+  return <div className="space-y-1">{elements}</div>;
+}
 
 export function AnswerDisplayPage({
   activeConcept,
@@ -32,7 +143,41 @@ export function AnswerDisplayPage({
       learnerProfile?.ageGroup?.toLowerCase()?.includes("college") ? "college" : "adult";
 
   const ageContent = activeConcept?.ageContent || {};
-  const explanationText = ageContent[ageGroupKey] || Object.values(ageContent)[0] || "";
+
+  // Standard model explanation (factual, systematic baseline without personality metadata)
+  const standardExplanation = stripPersonaMetadata(
+    activeConcept?.standardAnswer ||
+    activeConcept?.ageContent?.adult ||
+    activeConcept?.ageContent?.college ||
+    Object.values(ageContent)[0] ||
+    ""
+  );
+
+  // Personalized answer (adapted to learner persona, age, style)
+  let rawPersonalized = stripPersonaMetadata(
+    activeConcept?.personalizedAnswer ||
+    activeConcept?.styleContent?.[user?.preferredStyles?.[0]] ||
+    activeConcept?.styleContent?.["Simple Explanation"] ||
+    activeConcept?.ageContent?.[ageGroupKey] ||
+    ""
+  );
+
+  // If personalized answer is missing or identical to standard explanation, dynamically adapt it
+  const personalizedExplanation = (
+    rawPersonalized && rawPersonalized !== standardExplanation
+      ? rawPersonalized
+      : stripPersonaMetadata(
+          adaptExplanationForLearner(
+            standardExplanation,
+            learnerProfile,
+            user,
+            activeConcept?.title || ""
+          )
+        )
+  );
+
+  // Active explanation for read-aloud and downstream transformation tools
+  const activeExplanationForTools = personalizedExplanation || standardExplanation;
 
   const analogyContent = activeConcept?.analogy || {};
   const analogyText = analogyContent[ageGroupKey] || Object.values(analogyContent)[0] || "";
@@ -44,7 +189,7 @@ export function AnswerDisplayPage({
     setTransformedData(null);
     setTransformError("");
     setShowAnimatedExplanation(false);
-  }, [activeConcept?.title, explanationText]);
+  }, [activeConcept?.title, standardExplanation, personalizedExplanation]);
 
   const handleFormatSelect = async (formatKey) => {
     // 1. Guard against double-clicks while transforming
@@ -84,7 +229,7 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
 `;
 
       const response = await transformResponse(
-        explanationText,
+        activeExplanationForTools,
         formatKey,
         learnerProfileText
       );
@@ -147,7 +292,10 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
     <div className="w-full space-y-8 animate-fade-in py-2">
 
       {/* Top Header Card */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800 rounded-3xl p-6">
+      <div 
+        className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-950/75 border border-slate-800 rounded-3xl p-6 backdrop-blur-[14px] shadow-xl"
+        style={{ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+      >
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-brand-400 uppercase mb-1">
             <span>Subject Category: {activeConcept.category}</span>
@@ -194,7 +342,7 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
           </div>
 
           <button
-            onClick={() => handleReadAloud(explanationText)}
+            onClick={() => handleReadAloud(activeExplanationForTools)}
             className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center transition-all ${isReadingAloud ? "bg-emerald-600 border-emerald-500 text-white" : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-850"}`}
             title="Read explanation aloud"
           >
@@ -211,32 +359,55 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
         </div>
       </div>
 
-      {/* Answer View Tabs */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        {/* Left Column: Personalized Text & Interactive Transformations */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Answer View */}
+      <div className="w-full max-w-4xl mx-auto space-y-6">
 
           {/* Main customized explanation box */}
-          <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 backdrop-blur-md shadow-2xl">
-            <div className="bg-slate-950/80 border border-slate-800/80 p-5 md:p-6 rounded-2xl shadow-inner backdrop-blur-sm space-y-3">
-              <h3 className="text-xs font-bold text-brand-400 uppercase tracking-wider">
-                Customized Explanation for you!
-              </h3>
-              <p className="text-slate-100 text-base md:text-lg leading-relaxed font-medium">
-                {explanationText}
-              </p>
+          <div 
+            className="bg-slate-950/75 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 backdrop-blur-[14px] shadow-2xl"
+            style={{ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+          >
+            {/* Div 1: Standard Explanation generated by the model */}
+            <div 
+              className="bg-slate-950/70 border border-slate-800/80 p-5 md:p-6 rounded-2xl shadow-inner backdrop-blur-[14px] space-y-3"
+              style={{ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                    <LucideIcon name="cpu" className="w-4 h-4" />
+                  </span>
+                  <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                    Standard Explanation
+                  </h3>
+                </div>
+                <span className="text-[11px] font-medium text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-full border border-slate-800">
+                  Model Baseline
+                </span>
+              </div>
+              <FormattedExplanation text={standardExplanation} isPersonalized={false} />
             </div>
 
-            {/* Render dynamic styles based on user selections */}
+            {/* Div 2: Personalized Answer displayed right after standard explanation */}
             <div className="border-t border-slate-850 pt-6 space-y-4">
-              <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider">
-                Style Adaptation: {user.preferredStyles[0] || "Standard Explanation"}
-              </h4>
-              <div className="bg-slate-950/60 border border-slate-900 p-5 rounded-2xl">
-                <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">
-                  {activeConcept?.styleContent?.[user?.preferredStyles?.[0]] || activeConcept?.styleContent?.["Simple Explanation"] || ""}
-                </p>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-brand-500/15 text-brand-400 border border-brand-500/30">
+                    <LucideIcon name="sparkles" className="w-4 h-4" />
+                  </span>
+                  <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider">
+                    Personalized Answer
+                  </h4>
+                </div>
+                <span className="text-[11px] font-medium text-brand-300 bg-brand-500/10 px-2.5 py-1 rounded-full border border-brand-500/20">
+                  Tailored For You
+                </span>
+              </div>
+              <div 
+                className="bg-slate-950/70 border border-slate-800/80 p-5 md:p-6 rounded-2xl shadow-inner backdrop-blur-[14px]"
+                style={{ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+              >
+                <FormattedExplanation text={personalizedExplanation} isPersonalized={true} />
               </div>
             </div>
 
@@ -274,9 +445,12 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
 
           {/* 🎬 Animated Explanation Player Stage */}
           {showAnimatedExplanation && (
-            <AnimatedExplanationPlayer
+            <DynamicAnimatedLearningVideo
+              animationPlan={activeConcept?.animation}
+              answer={activeExplanationForTools}
+              user={user}
+              learnerProfile={learnerProfile}
               title={activeConcept?.title || "Concept Explanation"}
-              explanationText={explanationText}
               onClose={() => {
                 if ('speechSynthesis' in window) {
                   window.speechSynthesis.cancel();
@@ -287,7 +461,10 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
           )}
 
           {/* Response Transformation Section */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6">
+          <div 
+            className="bg-slate-950/75 border border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 backdrop-blur-[14px] shadow-xl"
+            style={{ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+          >
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xs font-bold text-brand-400 uppercase tracking-wider">
@@ -400,44 +577,6 @@ Character Traits: ${(learnerProfile?.traits || []).join(", ")}
               <span>Not helpful</span>
             </button>
           </div>
-
-        </div>
-
-        {/* Right Column: Code, Analogy, Quick Card */}
-        <div className="space-y-6">
-
-          {/* Analogy Box */}
-          {learnerProfile?.learningPreference !== "quick-simple" && (
-            <div className="bg-gradient-to-br from-indigo-950/20 to-slate-900 border border-brand-500/10 rounded-3xl p-6 glow-indigo">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="p-1.5 rounded-xl bg-brand-500/10 text-brand-400">
-                  <LucideIcon name="brain" className="w-4 h-4" />
-                </span>
-                <h4 className="font-display font-bold text-sm text-slate-200">Think of it like this</h4>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed italic">
-                "{analogyText}"
-              </p>
-            </div>
-          )}
-
-          Example / Code Box
-          <div className="bg-slate-900 border border-slate-850 rounded-3xl p-6 space-y-4">
-            {/* <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-400">
-                <LucideIcon name="code" className="w-4 h-4" />
-              </span>
-              <h4 className="font-display font-bold text-sm text-slate-200">💻 Example Reference</h4>
-            </div> */}
-            <pre className="code-block-pre text-xs text-brand-300 p-4 rounded-xl overflow-x-auto leading-relaxed">
-              <code>{activeConcept.code}</code>
-            </pre>
-          </div>
-
-
-
-        </div>
-
       </div>
 
     </div>

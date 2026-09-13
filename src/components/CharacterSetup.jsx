@@ -1,8 +1,8 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { LucideIcon } from './LucideIcon';
 import { generateLearnerProfile } from '../services/profile';
 
-export function CharacterSetup({ setView, setUser, setLearnerProfile }) {
+export function CharacterSetup({ setView, user, setUser, setLearnerProfile }) {
   const [step, setStep] = useState(0); // 0: Welcome, 1: Color, 2: Place, 3: Activity, 4: Age, 5: Style, 6: Character Result
   const [selections, setSelections] = useState({
     color: '',
@@ -68,6 +68,9 @@ export function CharacterSetup({ setView, setUser, setLearnerProfile }) {
   // Generate learning character profile
   const handleGenerateProfile = () => {
     const profile = generateLearnerProfile(selections);
+    if (user?.name) {
+      profile.name = user.name;
+    }
     setComputedProfile(profile);
     setLearnerProfile(profile);
     localStorage.setItem("learnmateProfile", JSON.stringify(profile));

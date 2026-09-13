@@ -40,14 +40,14 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
         </div>
         <div className="flex items-center gap-2.5">
           {stats && (
-            <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-2">
+            <div className="p-3 bg-slate-950/70 backdrop-blur-md border border-slate-800/80 rounded-2xl flex items-center gap-2 shadow-sm">
               <span className="text-xs font-semibold text-slate-400">Daily Streak:</span>
               <span className="text-xs bg-orange-500/20 text-orange-300 font-bold px-2 py-0.5 rounded-full border border-orange-500/20 flex items-center gap-1">
                 <span>🔥</span> {stats.streakDays} {stats.streakDays === 1 ? 'Day' : 'Days'}
               </span>
             </div>
           )}
-          <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-2">
+          <div className="p-3 bg-slate-950/70 backdrop-blur-md border border-slate-800/80 rounded-2xl flex items-center gap-2 shadow-sm">
             <span className="text-xs font-semibold text-slate-400">Settings Status:</span>
             <span className="text-xs bg-brand-500/20 text-brand-300 font-bold px-2 py-0.5 rounded-full border border-brand-500/20">Active</span>
           </div>
@@ -55,7 +55,7 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
       </div>
 
       {/* Large AI Search Box Card */}
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden glow-indigo">
+      <div className="bg-slate-950/70 backdrop-blur-md border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden glow-indigo">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative flex items-center">
             <div className="absolute left-4 text-slate-500">
@@ -67,7 +67,7 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
               value={typedInput}
               onChange={(e) => setTypedInput(e.target.value)}
               placeholder="Ask anything... e.g., Explain photosynthesis"
-              className="w-full bg-slate-950 border border-slate-850 rounded-2xl py-4 pl-12 pr-28 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 text-base md:text-lg transition-all"
+              className="w-full bg-slate-950/75 backdrop-blur-sm border border-slate-800/80 rounded-2xl py-4 pl-12 pr-28 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 text-base md:text-lg transition-all"
             />
 
             {/* Action Buttons within Search bar */}
@@ -76,7 +76,7 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
                 type="button"
                 onClick={() => setShowMicAlert(true)}
                 title="Voice input (disabled in demo)"
-                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 rounded-lg transition-colors"
               >
                 <LucideIcon name="mic" className="w-4 h-4" />
               </button>
@@ -84,14 +84,14 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
                 type="button"
                 onClick={() => setShowClipAlert(true)}
                 title="Attach document (disabled in demo)"
-                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 rounded-lg transition-colors"
               >
                 <LucideIcon name="paperclip" className="w-4 h-4" />
               </button>
               <button
                 type="submit"
                 disabled={!typedInput.trim()}
-                className={`p-2.5 rounded-xl font-bold flex items-center justify-center transition-all ${typedInput.trim() ? "bg-brand-600 hover:bg-brand-500 text-white" : "bg-slate-800 text-slate-600 cursor-not-allowed"}`}
+                className={`p-2.5 rounded-xl font-bold flex items-center justify-center transition-all ${typedInput.trim() ? "bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-500/20" : "bg-slate-850/80 text-slate-600 cursor-not-allowed"}`}
               >
                 <LucideIcon name="arrow-right" className="w-4 h-4" />
               </button>
@@ -101,7 +101,7 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
 
         {/* Suggestion tags under input */}
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-slate-500 font-semibold">Try asking:</span>
+          <span className="text-slate-400 font-semibold">Try asking:</span>
           {suggestedQuestions.map((q, idx) => {
             let displayQ = q;
             const pref = learnerProfile?.learningPreference;
@@ -116,7 +116,7 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
               <button
                 key={q}
                 onClick={() => triggerPipelineSearch(q)}
-                className="px-3 py-1 rounded-full bg-slate-950 border border-slate-850 hover:bg-slate-850 hover:text-brand-300 text-slate-400 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-full bg-slate-900/70 backdrop-blur-sm border border-slate-800/80 hover:bg-slate-800/80 hover:text-brand-300 text-slate-300 transition-all cursor-pointer"
               >
                 "{displayQ}"
               </button>
@@ -187,74 +187,55 @@ export function DashboardPage({ user, learnerProfile, triggerPipelineSearch, use
             <button
               key={c.name}
               onClick={() => triggerPipelineSearch(`Explain ${c.tag}`)}
-              className="p-5 rounded-2xl bg-slate-900/50 border border-slate-850 text-left hover:border-slate-700 hover:bg-slate-900 transition-all group flex flex-col justify-between h-36"
+              className="p-5 rounded-2xl bg-slate-950/70 backdrop-blur-md border border-slate-800/80 text-left hover:border-slate-700 hover:bg-slate-900/80 transition-all group flex flex-col justify-between h-36 shadow-lg"
             >
               <div className={`p-2.5 rounded-xl border w-fit ${c.color} transition-transform group-hover:scale-105 duration-200`}>
                 <LucideIcon name={c.icon} className="w-5 h-5" />
               </div>
               <div>
                 <span className="font-bold text-sm text-slate-200 group-hover:text-white block mt-3">{c.name}</span>
-                <span className="text-[10px] text-slate-500 block mt-0.5">Quick lesson</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">Quick lesson</span>
               </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Search History & Streak Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Recents list */}
-        <div className="lg:col-span-2 bg-slate-900/40 border border-slate-900 rounded-3xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-display font-bold text-lg text-slate-300">Your Learning Logs</h4>
-            <LucideIcon name="history" className="w-4 h-4 text-slate-600" />
-          </div>
-
-          <div className="space-y-2">
-            {userSearchHistory.length > 0 ? (
-              userSearchHistory.map((h, i) => (
-                <button
-                  key={i}
-                  onClick={() => triggerPipelineSearch(h.query)}
-                  className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-800/40 text-left group transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="p-1.5 rounded-lg bg-slate-800 text-brand-400 group-hover:bg-brand-500 group-hover:text-white transition-colors">
-                      <LucideIcon name="sparkles" className="w-3.5 h-3.5" />
-                    </span>
-                    <span className="text-sm font-semibold text-slate-300 group-hover:text-slate-100 transition-colors">{h.query}</span>
-                  </div>
-                  <span className="text-xs text-slate-500 font-medium">{h.date}</span>
-                </button>
-              ))
-            ) : (
-              <p className="text-xs text-slate-600 p-4 text-center">No queries searched yet.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Pipeline banner card */}
-        <div className="bg-gradient-to-br from-brand-900/40 to-slate-900 border border-brand-500/10 rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/5 rounded-full blur-2xl"></div>
+      {/* Search History Section */}
+      <div className="w-full bg-slate-950/70 backdrop-blur-md border border-slate-800/80 rounded-3xl p-6 md:p-8 shadow-xl">
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <div className="w-10 h-10 bg-brand-500/10 border border-brand-500/20 rounded-xl flex items-center justify-center text-brand-300 mb-4">
-              <LucideIcon name="cog" className="w-5 h-5 animate-spin" />
-            </div>
-            <h4 className="font-display font-bold text-lg text-white">How Engine Adapts</h4>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              When you ask questions, LearnMate's pipeline generates multiple drafts, evaluates them against your style requirements, selects the best draft, and translates it for your learning profile.
-            </p>
+            <h4 className="font-display font-bold text-xl text-slate-200">Your Learning Logs</h4>
+            <p className="text-xs text-slate-400 mt-0.5">Quickly revisit recent topics and concepts you've explored</p>
           </div>
-          <button
-            onClick={() => setView("profile")}
-            className="text-xs text-brand-400 hover:text-brand-300 font-bold flex items-center gap-1 mt-6 group w-fit"
-          >
-            <span>Configure Engine Preferences</span>
-            <LucideIcon name="chevron-right" className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-          </button>
+          <div className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 text-slate-400">
+            <LucideIcon name="history" className="w-4 h-4 text-brand-400" />
+          </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {userSearchHistory.length > 0 ? (
+            userSearchHistory.map((h, i) => (
+              <button
+                key={i}
+                onClick={() => triggerPipelineSearch(h.query)}
+                className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-900/50 hover:bg-slate-850/80 border border-slate-800/60 hover:border-brand-500/40 text-left group transition-all"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="p-2 rounded-xl bg-slate-800/80 text-brand-400 group-hover:bg-brand-600 group-hover:text-white transition-colors shrink-0">
+                    <LucideIcon name="sparkles" className="w-4 h-4" />
+                  </span>
+                  <span className="text-sm font-semibold text-slate-200 group-hover:text-white truncate transition-colors">
+                    {h.query}
+                  </span>
+                </div>
+                <span className="text-xs text-slate-400 font-medium ml-3 shrink-0">{h.date}</span>
+              </button>
+            ))
+          ) : (
+            <p className="text-xs text-slate-500 p-6 text-center col-span-2">No queries searched yet.</p>
+          )}
+        </div>
       </div>
 
     </div>

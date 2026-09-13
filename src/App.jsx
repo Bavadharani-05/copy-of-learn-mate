@@ -3,7 +3,7 @@ import { LucideIcon } from './components/LucideIcon';
 import LandingPage from './components/LandingPage';
 import CharacterSetup from './components/CharacterSetup';
 import BackgroundLayer from './components/BackgroundLayer';
-import { applyLearnerTheme } from './services/profile';
+import { applyLearnerTheme, resetLearnerTheme, adaptExplanationForLearner, stripPersonaMetadata } from './services/profile';
 import DashboardPage from './components/DashboardPage';
 import AIProcessingPage from './components/AIProcessingPage';
 import AnswerDisplayPage from './components/AnswerDisplayPage';
@@ -12,7 +12,17 @@ import ProgressPage from './components/ProgressPage';
 import ProfilePage from './components/ProfilePage';
 
 import { MOCK_TOPICS, generateDynamicExplanation } from './constants/mockData';
-import { getStreakData, recordDailyActivity } from './services/streakService';
+import { getStreakData, recordDailyActivity, resetStreak } from './services/streakService';
+
+const DEFAULT_USER = {
+  name: "",
+  ageGroup: "College Student", // Child, Teen, College Student, Adult
+  learningLevel: "Intermediate", // Beginner, Intermediate, Advanced
+  difficulty: "Moderate", // Easy, Moderate, Challenging
+  responseLength: "Medium", // Short, Medium, Detailed
+  preferredStyles: ["Simple Explanation", "Examples", "Step-by-Step"],
+  hfSpaceUrl: "https://huggingface.co/spaces/Bavadharani05/learn-mate"
+};
 
 export function App() {
   // On mount, check if there is a saved learner profile
@@ -41,39 +51,33 @@ export function App() {
 
   // User profile settings
   const [user, setUser] = useState(() => {
-    const defaultUser = {
-      name: "Alex",
-      ageGroup: "College Student", // Child, Teen, College Student, Adult
-      learningLevel: "Intermediate", // Beginner, Intermediate, Advanced
-      difficulty: "Moderate", // Easy, Moderate, Challenging
-      responseLength: "Medium", // Short, Medium, Detailed
-      preferredStyles: ["Simple Explanation", "Examples", "Step-by-Step"],
-      hfSpaceUrl: "https://huggingface.co/spaces/Bavadharani05/learn-mate"
-    };
     try {
       const saved = localStorage.getItem("learnmateProfile");
       const parsed = saved ? JSON.parse(saved) : null;
       if (parsed) {
         return {
-          ...defaultUser,
-          ageGroup: parsed.ageGroup,
+          ...DEFAULT_USER,
+          name: parsed.name || "",
+          ageGroup: parsed.ageGroup || DEFAULT_USER.ageGroup,
           preferredStyles: [
             parsed.learningPreference === "quick-simple" ? "Simple Explanation" :
             parsed.learningPreference === "step-by-step" ? "Step-by-Step" :
             parsed.learningPreference === "practice-first" ? "Interactive Practice" : "Examples",
-            ...defaultUser.preferredStyles.filter(s => s !== parsed.learningPreference)
+            ...DEFAULT_USER.preferredStyles.filter(s => s !== parsed.learningPreference)
           ]
         };
       }
     } catch (e) {}
-    return defaultUser;
+    return DEFAULT_USER;
   });
 
   useEffect(() => {
-    if (learnerProfile) {
+    if (learnerProfile && view !== "landing") {
       applyLearnerTheme(learnerProfile);
+    } else {
+      resetLearnerTheme();
     }
-  }, [learnerProfile]);
+  }, [learnerProfile, view]);
 
   // User input states
   const [searchQuery, setSearchQuery] = useState("");
@@ -176,33 +180,49 @@ export function App() {
       return;
     }
 
+    const standard = stripPersonaMetadata(apiResults.answer_a || "");
+    let personalized = stripPersonaMetadata(apiResults.answer_b || "");
+
+    // Ensure personalized answer is distinctly adapted if identical or missing
+    if (!personalized || personalized === standard) {
+      personalized = adaptExplanationForLearner(
+        standard,
+        learnerProfile,
+        user,
+        query
+      );
+    }
+
     const conceptData = {
       title: query,
       category: "AI Model Response",
       icon: "cpu",
       color: "from-brand-600 to-indigo-500",
       remember: "This explanation was generated live by your LearnMate model on Hugging Face.",
-      code: apiResults.answer_b || apiResults.answer_a,
+      code: apiResults.code || null,
+      animation: apiResults.animation || null,
+      standardAnswer: standard,
+      personalizedAnswer: personalized,
       ageContent: {
-        child: apiResults.answer_a,
-        teen: apiResults.answer_a,
-        college: apiResults.answer_a,
-        adult: apiResults.answer_a
+        child: learnerProfile?.ageGroup?.toLowerCase()?.includes("child") ? personalized : standard,
+        teen: learnerProfile?.ageGroup?.toLowerCase()?.includes("teen") ? personalized : standard,
+        college: standard,
+        adult: standard
       },
       styleContent: {
-        [user.preferredStyles[0] || "Simple Explanation"]: apiResults.answer_b,
-        "Simple Explanation": apiResults.answer_b,
-        "Examples": apiResults.answer_b,
-        "Step-by-Step": apiResults.answer_b,
-        "Visual / Diagram": apiResults.answer_b,
-        "Story-based": apiResults.answer_b,
-        "Interactive Practice": apiResults.answer_b
+        [user.preferredStyles[0] || "Simple Explanation"]: personalized,
+        "Simple Explanation": personalized,
+        "Examples": personalized,
+        "Step-by-Step": personalized,
+        "Visual / Diagram": personalized,
+        "Story-based": personalized,
+        "Interactive Practice": personalized
       },
       analogy: {
-        child: apiResults.answer_b,
-        teen: apiResults.answer_b,
-        college: apiResults.answer_b,
-        adult: apiResults.answer_b
+        child: personalized,
+        teen: personalized,
+        college: personalized,
+        adult: personalized
       },
       practice: [
         {
@@ -250,12 +270,73 @@ export function App() {
     };
   }, []);
 
+  // Logout handler: clears stored profile and preferences, resets state to defaults, and returns to landing
+  const handleLogout = () => {
+    // 1. Cancel speech synthesis if currently active
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsReadingAloud(false);
+
+    // 2. Clear all user profile and preference keys from localStorage
+    const profileKeys = [
+      "learnmateProfile",
+      "learnmate_preferences",
+      "learnmate_user",
+      "learnmate_theme",
+      "learnmate_character",
+      "learnerProfile",
+      "learnmate_streak"
+    ];
+    profileKeys.forEach(k => {
+      try {
+        localStorage.removeItem(k);
+      } catch (e) {}
+    });
+
+    // Reset daily streak to 0 in storage
+    resetStreak();
+
+    // Also scan and remove any dynamically set profile or preference keys
+    try {
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.toLowerCase().includes("profile") || key.toLowerCase().includes("preference") || key.toLowerCase().includes("user") || key.toLowerCase().includes("streak"))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+
+    // 3. Reset user profile, preference state, and streak stats back to default empty values
+    setLearnerProfile(null);
+    setUser(DEFAULT_USER);
+    resetLearnerTheme();
+    setStats({
+      conceptsLearned: 0,
+      questionsAsked: 0,
+      practiceAccuracy: 0,
+      streakDays: 0
+    });
+
+    // 4. Reset search, explanation, and practice states
+    setActiveConcept(null);
+    setSearchQuery("");
+    setCurrentPracticeQIndex(0);
+    setPracticeAnswerFeedback(null);
+
+    // 5. Return user to initial home screen where they enter their name
+    setView("landing");
+    triggerToast("👋 Logged out. Preferences and profile reset.");
+  };
+
   const isAccessibleText = learnerProfile?.ageGroup?.toLowerCase()?.includes("elder") || 
                            learnerProfile?.ageGroup?.toLowerCase()?.includes("older");
 
   return (
     <div className={`min-h-screen text-slate-100 flex flex-col font-sans relative ${isAccessibleText ? 'theme-accessible-text' : ''}`}>
-      <BackgroundLayer profile={learnerProfile} />
+      <BackgroundLayer profile={view === "landing" ? null : learnerProfile} />
 
       {/* Toast Alert Banner */}
       {showToast && (
@@ -270,7 +351,10 @@ export function App() {
 
         {/* Navigation Sidebar (Hidden on landing page & onboarding) */}
         {view !== "landing" && !view.startsWith("onboarding") && (
-          <aside className="w-full md:w-64 bg-slate-900/90 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col flex-shrink-0 z-30">
+          <aside 
+            className="w-full md:w-64 bg-slate-950/75 backdrop-blur-[14px] border-b md:border-b-0 md:border-r border-slate-800/80 flex flex-col flex-shrink-0 z-30 transition-all"
+            style={{ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+          >
             {/* Logo area */}
             <div className="p-6 flex items-center gap-3 border-b border-slate-800/60">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
@@ -283,7 +367,7 @@ export function App() {
             </div>
 
             {/* Profile badge summary */}
-            <div className="px-6 py-4 border-b border-slate-800/40 bg-slate-900/30">
+            <div className="px-6 py-4 border-b border-slate-800/40 bg-slate-950/40">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-brand-300">
                   {user.name.charAt(0)}
@@ -353,6 +437,14 @@ export function App() {
                 <LucideIcon name="settings" className="w-4 h-4" />
                 <span>Profile & Styles</span>
               </button>
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm text-slate-400 hover:bg-rose-950/25 hover:text-rose-300 border border-transparent hover:border-rose-900/30"
+              >
+                <LucideIcon name="log-out" className="w-4 h-4 text-slate-400" />
+                <span>Log Out</span>
+              </button>
             </nav>
 
             {/* Sidebar Footer Badge */}
@@ -408,13 +500,11 @@ export function App() {
                   <span>{user.preferredStyles[0] || "Adaptive"}</span>
                 </div>
                 <button
-                  onClick={() => {
-                    setView("landing");
-                    triggerToast("👋 Logged out of profile.");
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white transition-all text-xs font-medium"
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white transition-all text-xs font-medium flex items-center gap-1.5"
                 >
-                  Log Out
+                  <LucideIcon name="log-out" className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Log Out</span>
                 </button>
               </div>
             </header>
@@ -429,6 +519,7 @@ export function App() {
             {view === "character-setup" && (
               <CharacterSetup
                 setView={setView}
+                user={user}
                 setUser={setUser}
                 setLearnerProfile={setLearnerProfile}
               />
@@ -504,6 +595,7 @@ export function App() {
                 setLearnerProfile={setLearnerProfile}
                 setView={setView}
                 triggerToast={triggerToast}
+                onLogout={handleLogout}
               />
             )}
           </div>

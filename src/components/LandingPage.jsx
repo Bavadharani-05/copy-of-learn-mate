@@ -1,13 +1,17 @@
-﻿import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LucideIcon } from './LucideIcon';
 import { generateLearnerProfile } from '../services/profile';
 
 export function LandingPage({ setView, user, setUser, setLearnerProfile }) {
-  const [mockName, setMockName] = useState(user.name || "Alex");
+  const [mockName, setMockName] = useState(user?.name || "");
+
+  useEffect(() => {
+    setMockName(user?.name || "");
+  }, [user?.name]);
 
   const handleStart = (e) => {
     e.preventDefault();
-    setUser(prev => ({ ...prev, name: mockName || "Alex" }));
+    setUser(prev => ({ ...prev, name: mockName.trim() || "Alex" }));
     setView("character-setup");
   };
 
@@ -67,7 +71,8 @@ export function LandingPage({ setView, user, setUser, setLearnerProfile }) {
             <button
               type="button"
               onClick={() => {
-                setUser(prev => ({ ...prev, name: mockName || "Alex" }));
+                const finalName = mockName.trim() || "Alex";
+                setUser(prev => ({ ...prev, name: finalName }));
                 const defaultProfile = generateLearnerProfile({
                   color: "purple",
                   place: "library",
@@ -75,6 +80,7 @@ export function LandingPage({ setView, user, setUser, setLearnerProfile }) {
                   ageGroup: "Teen",
                   learningPreference: "step-by-step"
                 });
+                defaultProfile.name = finalName;
                 setLearnerProfile(defaultProfile);
                 localStorage.setItem("learnmateProfile", JSON.stringify(defaultProfile));
                 setView("dashboard");

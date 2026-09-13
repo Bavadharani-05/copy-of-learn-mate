@@ -1,7 +1,53 @@
 import { Client } from "@gradio/client";
+import { parseAnimationPlan } from "../utils/animationPlanParser";
+import { adaptExplanationForLearner, stripPersonaMetadata } from "./profile";
 
 export const TRANSFORMER_API_URL = "https://bavadharani05-image-analyzer.hf.space/transform";
 export const DIRECT_HF_SPACE = "https://bavadharani05-learn-mate.hf.space";
+
+/**
+ * Safely inspects and extracts both text answer and structured animation plan
+ * from potential JSON or mixed-content model outputs.
+ */
+function extractAnswerAndAnimation(rawOutput) {
+  if (!rawOutput) return { answer: "", animation: null };
+
+  if (typeof rawOutput === "object") {
+    const ans = rawOutput.answer || rawOutput.answer_b || rawOutput.content || "";
+    const anim = rawOutput.animation ? parseAnimationPlan(rawOutput.animation, ans) : null;
+    return { answer: ans, animation: anim };
+  }
+
+  if (typeof rawOutput === "string") {
+    let text = rawOutput.trim();
+
+    // Check if it's JSON or has markdown code fence
+    const stripped = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const firstBrace = stripped.indexOf("{");
+    const lastBrace = stripped.lastIndexOf("}");
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        const candidate = stripped.substring(firstBrace, lastBrace + 1);
+        const parsed = JSON.parse(candidate);
+        if (parsed && (parsed.answer || parsed.animation || parsed.scenes)) {
+          const ans = parsed.answer || parsed.content || "";
+          const anim = parsed.animation ? parseAnimationPlan(parsed.animation, ans) : (parsed.scenes ? parseAnimationPlan(parsed, ans) : null);
+          return {
+            answer: ans || text,
+            animation: anim
+          };
+        }
+      } catch (e) {
+        // Not a JSON payload, proceed with raw text
+      }
+    }
+
+    return { answer: text, animation: null };
+  }
+
+  return { answer: String(rawOutput), animation: null };
+}
 
 // Singleton cache for the Gradio Client connection
 let cachedClient = null;
@@ -95,7 +141,8 @@ export const responseFormats = {
   example: "Real-World Example",
   challenge: "Mini Challenge",
   story: "Story Explanation",
-  keypoints: "Key Points"
+  keypoints: "Key Points",
+  animation: "Animated Explanation"
 };
 
 export const formatSchemaInstructions = {
@@ -121,7 +168,10 @@ export const formatSchemaInstructions = {
 {"type":"story","title":"...","story":"...","lesson":"..."}`,
 
   keypoints: `Key Points. Return compact raw JSON (4 concise takeaways):
-{"type":"keypoints","title":"...","points":["...","...","...","..."]}`
+{"type":"keypoints","title":"...","points":["...","...","...","..."]}`,
+
+  animation: `Animated Explanation Plan. Return compact raw JSON with 3 to 6 progressive scenes:
+{"type":"animation","title":"...","environment":"nature|digital network|computer|graph grid|laboratory|classroom|generic","scenes":[{"duration":4,"caption":"...","objects":["..."],"actions":["..."]}]}`
 };
 
 const MAX_SOURCE_CHARS = 3500;
@@ -201,18 +251,37 @@ export async function fetchFromHuggingFace(spaceUrlOrParams, questionArg, signal
         throw new Error("Invalid response format received from Hugging Face model.");
       }
 
-      const standardAnswer = (result.data[0] || "").trim();
-      const personalizedAnswer = (result.data[1] || "").trim();
+      let standardAnswer = (result.data[0] || "").trim();
+      let personalizedAnswerRaw = (result.data[1] || "").trim();
 
-      if (!standardAnswer && !personalizedAnswer) {
+      if (!standardAnswer && personalizedAnswerRaw) {
+        standardAnswer = personalizedAnswerRaw;
+      }
+
+      if (!standardAnswer && !personalizedAnswerRaw) {
         throw new Error("Model returned empty responses. Please try rephrasing your question.");
       }
 
       if (onStatus) onStatus("AI response received!");
 
+      standardAnswer = stripPersonaMetadata(standardAnswer);
+      const extracted = extractAnswerAndAnimation(personalizedAnswerRaw);
+      let personalizedFinal = stripPersonaMetadata(extracted.answer || personalizedAnswerRaw);
+
+      // Ensure personalized answer is distinctly adapted if identical or empty
+      if (!personalizedFinal || personalizedFinal === standardAnswer) {
+        personalizedFinal = adaptExplanationForLearner(
+          standardAnswer,
+          { ageGroup: age, learningPreference: learningStyle, environment },
+          null,
+          cleanQuestion
+        );
+      }
+
       return {
-        answer_a: standardAnswer,
-        answer_b: personalizedAnswer
+        answer_a: stripPersonaMetadata(standardAnswer),
+        answer_b: stripPersonaMetadata(personalizedFinal),
+        animation: extracted.animation || null
       };
     } catch (error) {
       if (error.name === 'AbortError' || signal?.aborted) {
@@ -228,6 +297,62 @@ export async function fetchFromHuggingFace(spaceUrlOrParams, questionArg, signal
 
   inFlightRequests.set(requestKey, executionPromise);
   return executionPromise;
+}
+
+/**
+ * Safely reads the response body stream once as text, then attempts to parse as JSON.
+ * Returns { text, data } where data is parsed JSON (or null if parsing failed).
+ */
+async function readResponsePayload(response) {
+  let text = "";
+  try {
+    text = await response.text();
+  } catch (err) {
+    console.warn("Could not read response body stream:", err);
+    text = "";
+  }
+
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
+
+  return { text, data };
+}
+
+/**
+ * Extracts a meaningful error message from parsed response data, raw text, or HTTP status.
+ */
+function extractErrorMessage(data, text, response) {
+  if (data && typeof data === "object") {
+    if (data.error && typeof data.error === "string") return data.error;
+    if (data.error && typeof data.error === "object" && data.error.message) return data.error.message;
+    if (data.message && typeof data.message === "string") return data.message;
+    if (data.detail && typeof data.detail === "string") return data.detail;
+  } else if (typeof data === "string" && data.trim()) {
+    return data.trim();
+  }
+
+  if (text && typeof text === "string") {
+    const trimmed = text.trim();
+    if (trimmed) {
+      if (trimmed.startsWith("<") && (trimmed.includes("<!DOCTYPE") || trimmed.includes("<html"))) {
+        const titleMatch = trimmed.match(/<title>([^<]+)<\/title>/i);
+        const preMatch = trimmed.match(/<pre>([^<]+)<\/pre>/i) || trimmed.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+        const extracted = [titleMatch?.[1], preMatch?.[1]].filter(Boolean).join(" - ");
+        if (extracted) {
+          return `Server error (${response.status}): ${extracted.trim()}`;
+        }
+      }
+      return trimmed;
+    }
+  }
+
+  return `Backend server returned status ${response.status}${response.statusText ? ` (${response.statusText})` : ""}`;
 }
 
 export async function getPersonalizedAnswer(params) {
@@ -269,41 +394,78 @@ export async function getPersonalizedAnswer(params) {
     })
   });
 
+  // Read response stream exactly once
+  const { text, data } = await readResponsePayload(response);
+
   if (!response.ok) {
-    let errorMessage = `Backend server returned status ${response.status}`;
-    try {
-      const errorJson = await response.json();
-      if (errorJson?.error) {
-        errorMessage = errorJson.error;
-      }
-    } catch {
-      const text = await response.text();
-      if (text) errorMessage = text;
-    }
+    const errorMessage = extractErrorMessage(data, text, response);
     throw new Error(errorMessage);
   }
 
-  const data = await response.json();
-
-  if (!data || (!data.answer_a && !data.answer_b)) {
+  if (!data || (!data.answer_a && !data.answer_b && !data.answer)) {
+    if (text && text.trim()) {
+      const extracted = extractAnswerAndAnimation(text);
+      return {
+        answer_a: text.trim(),
+        answer_b: extracted.answer || text.trim(),
+        animation: extracted.animation || null
+      };
+    }
     throw new Error("Backend returned empty responses. Please verify your backend server.");
   }
 
   if (onStatus) onStatus("AI response received from backend!");
 
+  let rawB = (data.answer_b || "").trim();
+  let rawA = (data.answer_a || "").trim();
+
+  // If backend returns single explanation (e.g. data.answer or data.result), assign to standard answer rawA
+  if (!rawA && (data.answer || data.result)) {
+    rawA = (data.answer || data.result).trim();
+  }
+
+  // If rawA was not populated but rawB was, assign rawA
+  if (!rawA && rawB) {
+    rawA = rawB;
+  }
+
+  let animationPlan = data.animation ? parseAnimationPlan(data.animation, rawB || rawA) : null;
+
+  if (!animationPlan && typeof rawB === "string") {
+    const extracted = extractAnswerAndAnimation(rawB);
+    if (extracted.animation) {
+      animationPlan = extracted.animation;
+      rawB = extracted.answer || rawB;
+    }
+  }
+
+  rawA = stripPersonaMetadata(rawA);
+  rawB = stripPersonaMetadata(rawB);
+
+  // Guarantee that personalized answer rawB is distinct from standard answer rawA
+  if (!rawB || rawB === rawA) {
+    rawB = adaptExplanationForLearner(
+      rawA,
+      { ageGroup: age, learningPreference: learningStyle, environment },
+      null,
+      cleanQuestion
+    );
+  }
+
   return {
-    answer_a: (data.answer_a || "").trim(),
-    answer_b: (data.answer_b || data.answer_a || "").trim()
+    answer_a: stripPersonaMetadata(rawA),
+    answer_b: stripPersonaMetadata(rawB),
+    animation: animationPlan
   };
 }
 
 export async function transformResponse(originalAnswer, formatKeyOrDescription, learnerProfile) {
-  const formatKey = Object.keys(responseFormats).find(k => 
+  const formatKey = Object.keys(responseFormats).find(k =>
     k === formatKeyOrDescription || responseFormats[k] === formatKeyOrDescription
   ) || "simple";
 
   const promptWithSchema = formatSchemaInstructions[formatKey] || formatKeyOrDescription;
-  const trimmedAnswer = typeof originalAnswer === "string" 
+  const trimmedAnswer = typeof originalAnswer === "string"
     ? originalAnswer.slice(0, MAX_SOURCE_CHARS).trim()
     : "";
 
@@ -325,23 +487,51 @@ export async function transformResponse(originalAnswer, formatKeyOrDescription, 
 
     const elapsedMs = Math.round(performance.now() - startTime);
 
+    // Read response stream exactly once
+    const { text, data } = await readResponsePayload(response);
+
     if (!response.ok) {
-      let errorText = "";
-      try {
-        errorText = await response.text();
-      } catch (e) {}
-      throw new Error(`Transformer API error ${response.status}${errorText ? ': ' + errorText : ''}`);
+      const errorDetail = extractErrorMessage(data, text, response);
+      throw new Error(`Transformer API error (${response.status}): ${errorDetail}`);
     }
 
-    const data = await response.json();
-    if (!data || typeof data.response !== "string") {
-      throw new Error("Invalid response structure from Transformer API");
+    if (data && typeof data.response === "string") {
+      console.log(`⏱️ [Transformer Response] Completed in ${elapsedMs}ms`);
+      return data.response;
     }
 
-    console.log(`⏱️ [Transformer Response] Completed in ${elapsedMs}ms`);
-    return data.response;
+    // Fallback to raw text if JSON doesn't contain .response or if parsing failed
+    if (text && text.trim()) {
+      console.log(`⏱️ [Transformer Response] Completed in ${elapsedMs}ms (using raw text fallback)`);
+      return text.trim();
+    }
+
+    throw new Error("Invalid response structure from Transformer API");
   } catch (error) {
     console.error("Response Transformer API error:", error);
     throw error;
+  }
+}
+
+/**
+ * Requests an animation plan from Qwen/Transformer API, with automatic fallback
+ * to the dynamic local animation generator.
+ */
+export async function fetchAnimationPlan(explanationText, title = "Concept Explanation", learnerProfile = "") {
+  try {
+    const learnerProfileText = typeof learnerProfile === "string"
+      ? learnerProfile
+      : `Age: ${learnerProfile?.ageGroup || "Adult"}, Style: ${learnerProfile?.learningPreference || "Visual"}`;
+
+    const response = await transformResponse(
+      explanationText,
+      "animation",
+      learnerProfileText
+    );
+
+    return parseAnimationPlan(response, explanationText, title);
+  } catch (err) {
+    console.warn("Could not fetch animation plan from Transformer API, using dynamic local generator:", err);
+    return parseAnimationPlan(null, explanationText, title);
   }
 }

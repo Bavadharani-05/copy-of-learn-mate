@@ -1,7 +1,7 @@
-﻿import React from 'react';
+import React from 'react';
 import { LucideIcon } from './LucideIcon';
 
-export function ProfilePage({ user, setUser, learnerProfile, setLearnerProfile, setView, triggerToast }) {
+export function ProfilePage({ user, setUser, learnerProfile, setLearnerProfile, setView, triggerToast, onLogout }) {
   const ages = ["Child", "Teen", "College Student", "Adult"];
   const levels = ["Beginner", "Intermediate", "Advanced"];
   const difficulties = ["Easy", "Moderate", "Challenging"];
@@ -176,23 +176,35 @@ export function ProfilePage({ user, setUser, learnerProfile, setLearnerProfile, 
           </div>
 
           {/* Submit */}
-          <div className="pt-4 border-t border-slate-850 flex flex-wrap gap-3">
-            <button
-              onClick={handleSave}
-              className="bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 px-8 rounded-xl text-xs transition-all shadow-md hover:shadow-brand-500/10"
-            >
-              Update Preferences
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setView("character-setup");
-              }}
-              className="bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 font-semibold py-3 px-6 rounded-xl text-xs transition-all flex items-center gap-1.5"
-            >
-              <LucideIcon name="refresh-cw" className="w-3.5 h-3.5" />
-              <span>Change My Setup</span>
-            </button>
+          <div className="pt-4 border-t border-slate-850 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleSave}
+                className="bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 px-8 rounded-xl text-xs transition-all shadow-md hover:shadow-brand-500/10"
+              >
+                Update Preferences
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setView("character-setup");
+                }}
+                className="bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 font-semibold py-3 px-6 rounded-xl text-xs transition-all flex items-center gap-1.5"
+              >
+                <LucideIcon name="refresh-cw" className="w-3.5 h-3.5" />
+                <span>Change My Setup</span>
+              </button>
+            </div>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="bg-rose-950/30 border border-rose-900/40 hover:bg-rose-900/40 text-rose-300 font-semibold py-3 px-5 rounded-xl text-xs transition-all flex items-center gap-1.5"
+              >
+                <LucideIcon name="log-out" className="w-3.5 h-3.5 text-rose-400" />
+                <span>Log Out</span>
+              </button>
+            )}
           </div>
 
         </div>
